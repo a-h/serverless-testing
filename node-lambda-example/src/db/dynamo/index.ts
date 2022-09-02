@@ -17,21 +17,21 @@ export class DB {
                 this.table = table
         }
 
-        async get(name: string): Promise<Count> {
+         get = async (name: string): Promise<Count> => {
                 const params = new GetCommand({
                         TableName: this.table,
                         Key: { name },
                         ConsistentRead: true,
                 });
                 const result = await this.client.send(params)
-                return result.Item as Count
+                return result.Item ? result.Item as Count : { name, count: 0 }
         }
 
-        async put(name: string): Promise<Count> {
+         put = async (name: string): Promise<Count> => {
                 const put = new UpdateCommand({
                         TableName: this.table,
                         Key: { name },
-                        UpdateExpression: "SET if_not_exists(#c, :zero) + :one",
+                        UpdateExpression: "SET #c = if_not_exists(#c, :zero) + :one",
                         ExpressionAttributeNames: {
                                 "#c": "count",
                         },
