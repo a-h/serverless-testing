@@ -14,4 +14,6 @@ app.post("/vote", (req, res) => {
         }
 })
 
-app.listen(8000, "localhost")
+app.listen(3001, "localhost", () => {
+        console.log("listening on port 3001")
+})

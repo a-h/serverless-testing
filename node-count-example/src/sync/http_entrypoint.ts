@@ -11,5 +11,7 @@ const db = new DB()
 app.get(countGet.route, countGet.create(db.get))
 app.post(countPost.route, countPost.create(db.put))
 
-app.listen(8000, "localhost")
+app.listen(3000, "localhost", () => {
+	console.log("listening on port 3000")
+})
 
