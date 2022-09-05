@@ -4,9 +4,11 @@
   "description": "",
   "main": "output/main.js",
   "scripts": {
-    "build": "npx esbuild --bundle src/**/*.ts --outdir=output --platform=node",
-    "async": "npm run build && node output/async/http_entrypoint.js",
-    "sync": "npm run build && node output/sync/http_entrypoint.js",
+    "build-local": "npx esbuild --bundle src/http/server.ts --outdir=dist --platform=node",
+    "build-ci": "./esbuild/esbuild --bundle src/http/server.ts --outdir=dist --platform=node",
+    "local": "npm run build && node output/server.js",
+    "build-docker": "docker build -t a-h/node-count-example:latest .",
+    "docker": "docker run -p 3000:3000 a-h/node-count-example:latest",
     "lint": "npx eslint .",
     "test": "jest"
   },
