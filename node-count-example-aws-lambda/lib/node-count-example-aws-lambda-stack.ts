@@ -21,12 +21,14 @@ export class NodeCountExampleAwsLambdaStack extends cdk.Stack {
 			},
 			billingMode: BillingMode.PAY_PER_REQUEST,
 		});
+		const region =  cdk.Stack.of(this).region;
 
 		const api = new apigatewayv2.HttpApi(this, "Api")
 
 		const countPostFunction = new NodejsFunction(this, "CountPostFunction", {
 			environment: {
 				TABLE_NAME: table.tableName,
+				DYNAMODB_REGION: region,
 			},
 			entry: path.join(__dirname, "../../node-count-example/src/http/count/post/lambda/index.ts"),
 			logRetention: logs.RetentionDays.ONE_MONTH,
@@ -44,6 +46,7 @@ export class NodeCountExampleAwsLambdaStack extends cdk.Stack {
 		const countGetFunction = new NodejsFunction(this, "CountGetFunction", {
 			environment: {
 				TABLE_NAME: table.tableName,
+				DYNAMODB_REGION: region,
 			},
 			entry: path.join(__dirname, "../../node-count-example/src/http/count/get/lambda/index.ts"),
 			logRetention: logs.RetentionDays.ONE_MONTH,
