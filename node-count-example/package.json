@@ -1,5 +1,5 @@
 {
-  "name": "lambda-example",
+  "name": "count-example",
   "version": "1.0.0",
   "description": "",
   "main": "output/main.js",
