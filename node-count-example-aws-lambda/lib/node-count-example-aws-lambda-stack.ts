@@ -25,16 +25,20 @@ export class NodeCountExampleAwsLambdaStack extends cdk.Stack {
 
 		const api = new apigatewayv2.HttpApi(this, "Api")
 
-		const countPostFunction = new NodejsFunction(this, "CountPostFunction", {
+		const sharedFunctionConfig = {
 			environment: {
 				TABLE_NAME: table.tableName,
 				DYNAMODB_REGION: region,
 			},
-			entry: path.join(__dirname, "../../node-count-example/src/http/count/post/lambda/index.ts"),
 			logRetention: logs.RetentionDays.ONE_MONTH,
 			tracing: Tracing.ACTIVE,
 			memorySize: 1024,
 			timeout: Duration.seconds(10),
+		};
+
+		const countPostFunction = new NodejsFunction(this, "CountPostFunction", {
+			...sharedFunctionConfig,
+			entry: path.join(__dirname, "../../node-count-example/src/http/count/post/lambda/index.ts"),
 		});
 		table.grantReadWriteData(countPostFunction);
 		api.addRoutes({
@@ -44,15 +48,8 @@ export class NodeCountExampleAwsLambdaStack extends cdk.Stack {
 		});
 
 		const countGetFunction = new NodejsFunction(this, "CountGetFunction", {
-			environment: {
-				TABLE_NAME: table.tableName,
-				DYNAMODB_REGION: region,
-			},
+			...sharedFunctionConfig,
 			entry: path.join(__dirname, "../../node-count-example/src/http/count/get/lambda/index.ts"),
-			logRetention: logs.RetentionDays.ONE_MONTH,
-			tracing: Tracing.ACTIVE,
-			memorySize: 1024,
-			timeout: Duration.seconds(10),
 		});
 		table.grantReadData(countGetFunction);
 		api.addRoutes({
