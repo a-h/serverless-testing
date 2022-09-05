@@ -16,8 +16,7 @@ export class DB {
                 this.client = client
                 this.table = table
         }
-
-         get = async (name: string): Promise<Count> => {
+        get = async (name: string): Promise<Count> => {
                 const params = new GetCommand({
                         TableName: this.table,
                         Key: { name },
@@ -26,8 +25,7 @@ export class DB {
                 const result = await this.client.send(params)
                 return result.Item ? result.Item as Count : { name, count: 0 }
         }
-
-         put = async (name: string): Promise<Count> => {
+        put = async (name: string): Promise<Count> => {
                 const put = new UpdateCommand({
                         TableName: this.table,
                         Key: { name },
