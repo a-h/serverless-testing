@@ -1,6 +1,7 @@
 import { Construct } from "constructs";
 import { App, TerraformStack, RemoteBackend, TerraformAsset, AssetType, TerraformOutput } from "cdktf";
 import {
+    AppEngineApplication,
         CloudfunctionsFunction,
         CloudfunctionsFunctionIamBinding,
         GoogleProvider, StorageBucket, StorageBucketObject,
@@ -24,14 +25,22 @@ class MyStack extends TerraformStack {
                         credentials,
                 });
 
+                // Create a Cloud Firestore. This requires an AppEngine project.
+                new AppEngineApplication(this, "app-engine-app", {
+                        locationId: "europe-west",
+                        databaseType: "CLOUD_FIRESTORE",
+                })
 
+                // Create a function.
                 const codeBucket = new StorageBucket(this, "bucket", {
                         name: "a-h-node-count-storage-bucket",
                         location: "EU",
                 });
 
+                // This requires that the Cloud Function has already been built (i.e. esbuild has been run).
+                // See the package.json file for node-count-example, for the build script (cloudfunction-build).
                 const asset = new TerraformAsset(this, "cloud-function-asset", {
-                        path: path.join(__dirname, "../node-count-example/src/http/count/get/cloudfunction"),
+                        path: path.join(__dirname, "../node-count-example/src/http/count/cloudfunction/dist"),
                         type: AssetType.ARCHIVE,
                 });
 
@@ -41,8 +50,8 @@ class MyStack extends TerraformStack {
                         source: asset.path,
                 });
 
-                const cloudFunction = new CloudfunctionsFunction(this, "countGet", {
-                        name: "countGet",
+                const cloudFunction = new CloudfunctionsFunction(this, "count", {
+                        name: "fn",
                         runtime: "nodejs16",
                         availableMemoryMb: 256,
                         sourceArchiveBucket: codeBucket.name,

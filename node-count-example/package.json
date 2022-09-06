@@ -6,11 +6,13 @@
   "scripts": {
     "build-local": "npx esbuild --bundle src/http/server.ts --outdir=dist --platform=node",
     "build-ci": "./esbuild/esbuild --bundle src/http/server.ts --outdir=dist --platform=node",
-    "local": "npm run build && node output/server.js",
+    "local": "npm run build-local && node output/server.js",
     "build-docker": "docker build -t a-h/node-count-example:latest .",
     "docker": "docker run -p 3000:3000 a-h/node-count-example:latest",
     "lint": "npx eslint .",
-    "test": "jest"
+    "test": "jest",
+    "cloudfunction-build": "npx esbuild --bundle ./src/http/count/cloudfunction/ --outfile=./src/http/count/cloudfunction/dist/index.js --platform=node",
+    "cloudfunction-run": "npm run cloudfunction-build && npx functions-framework --source=./src/http/count/cloudfunction/dist/index.js --target=fn"
   },
   "author": "",
   "license": "ISC",
@@ -36,8 +38,10 @@
   },
   "dependencies": {
     "@aws-sdk/lib-dynamodb": "^3.163.0",
+    "@google-cloud/functions-framework": "^3.1.2",
     "@types/node": "^18.7.14",
     "express": "^4.18.1",
+    "firebase-admin": "^11.0.1",
     "serverless-http": "^3.0.2"
   }
 }
