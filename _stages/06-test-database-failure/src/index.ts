@@ -1,4 +1,4 @@
-import express, { RequestHandler, Response } from "express"
+import express, { Response } from "express"
 
 export interface Count {
 	name: string

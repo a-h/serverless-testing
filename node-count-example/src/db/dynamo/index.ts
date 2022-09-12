@@ -25,7 +25,7 @@ export class DB {
                 const result = await this.client.send(params)
                 return result.Item ? result.Item as Count : { name, count: 0 }
         }
-        put = async (name: string): Promise<Count> => {
+        increment = async (name: string): Promise<Count> => {
                 const put = new UpdateCommand({
                         TableName: this.table,
                         Key: { name },

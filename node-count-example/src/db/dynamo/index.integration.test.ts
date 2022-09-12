@@ -6,13 +6,13 @@ import {
 import { DB } from "./"
 
 describe("DynamoDB", () => {
-  describe("put", () => {
+  describe("get / increment", () => {
     it("creates a record if one does not exist, and sets the initial value to 1", async () => {
       const testDB = await createLocalTable();
       try {
         const db = new DB(testDB.client, testDB.name);
 
-        const actual = await db.put("test1")
+        const actual = await db.increment("test1")
         expect(actual).toEqual({
           name: "test1",
           count: 1,
@@ -26,20 +26,20 @@ describe("DynamoDB", () => {
       try {
         const db = new DB(testDB.client, testDB.name);
 
-        const beforePut = await db.get("test2")
-        expect(beforePut).toEqual({
+        const beforeIncrement = await db.get("test2")
+        expect(beforeIncrement).toEqual({
           name: "test2",
           count: 0,
         });
 
-        const putResult = await db.put("test2")
-        expect(putResult).toEqual({
+        const incrementResult = await db.increment("test2")
+        expect(incrementResult).toEqual({
           name: "test2",
           count: 1,
         });
 
-        const afterPut = await db.get("test2")
-        expect(afterPut).toEqual({
+        const afterIncrement = await db.get("test2")
+        expect(afterIncrement).toEqual({
           name: "test2",
           count: 1,
         });
@@ -52,9 +52,9 @@ describe("DynamoDB", () => {
       try {
         const db = new DB(testDB.client, testDB.name);
 
-        await db.put("test3")
-        await db.put("test3")
-        await db.put("test3")
+        await db.increment("test3")
+        await db.increment("test3")
+        await db.increment("test3")
 
         const afterPut = await db.get("test3")
         expect(afterPut).toEqual({
