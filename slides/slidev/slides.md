@@ -76,7 +76,7 @@ kill $!
 layout: two-cols
 ---
 
-## in-memory database
+## ./src/index.ts part 1 - database
 
 ```ts
 import express from "express"
@@ -102,7 +102,7 @@ async function increment(name: string): Promise<Count> {
 
 ::right::
 
-## server that uses it
+## ./src/index.ts part 2 - server
 
 ```ts
 const app = express()
@@ -158,7 +158,7 @@ layout: section
 
 ---
 
-# Separate the files
+# Separate handlers from the server
 
 ## ./src/index.ts
 
@@ -251,12 +251,6 @@ It makes the test output clear and understandable.
 layout: two-cols
 ---
 
-<style>
-li {
-  list-style:none;
-}
-</style>
-
 ## GET /count/{name}
 
 * <mdi-check-circle class="text-green-400" /> `name` and `count` as a JSON object.
@@ -342,7 +336,11 @@ app.get("/count/:name", async (req, res) => {
 ### ./src/index.ts - after
 
 ```ts
-export function createApp(): express.Express {
+import express from "express"
+
+type F = (name: string) => Promise<Count>
+
+function createApp(get: F, inc: F): express.Express {
   const app = express()
   app.use(express.json())
 
@@ -355,49 +353,12 @@ export function createApp(): express.Express {
 
   return app
 }
-```
 
-<!--
-Instead using the `app` variable at the module level, we'll create a function that creates the app, and returns it.
--->
-
----
-layout: statement
----
-
-# Cannot find name 'get'
-# Cannot find name 'increment'
-
-<!--
-Yeah, we moved them out to their own file.
--->
-
----
-
-## Add parameters for the database operations
-
-```ts
-type DBOperation = (name: string) => Promise<Count>
-
-export function createApp(get: DBOperation, increment: DBOperation): express.Express {
-  const app = express()
-  app.use(express.json())
-
-  app.get("/count/:name", async (req, res) => {
-    const response = await get(req.params.name)
-    res.json(response)
-  })
-
-  // ...
-
-  return app
-}
+export { createApp }
 ```
 
 <!-- 
-Now we've moved our database code to its own module, our `get` and `increment` functions can't be found.
-
-Instead of importing the module and using it directly, we can add parameters to the `createApp` function so that we can pass in any function that's the same shape as the `get` or `increment` function.
+Instead of importing the database module and using it directly, we can add parameters to the `createApp` function so that we can pass in any function that's the same shape as the `get` or `increment` function.
 
 This idea is called "Dependency Injection", and it allows us to use any database we like. An in-memory database, some code that works with DynamoDB, or a function that throws an error.
 -->
@@ -409,8 +370,8 @@ This idea is called "Dependency Injection", and it allows us to use any database
 ### ./src/server.ts
 
 ```ts
-import { createApp } from "./"
 import { DB } from "./db/inmemory"
+import { createApp } from "./"
 
 const db = new DB()
 const app = createApp(db.get, db.increment)
@@ -775,13 +736,248 @@ layout: section
 # Time to get cloudy
 
 ---
+layout: two-cols
+---
 
-# Options for Serverless deployments
+* Terraform (2014)
+  * <mdi-check-circle class="text-green-400" /> HCL
+  * <mdi-check-circle class="text-green-400" /> Uses AWS SDK directly
+  * <mdi-check-circle class="text-green-400" /> Written in Go
+  * <mdi-check-circle class="text-green-400" /> Module ecosystem
+  * <mdi-check-circle class="text-green-400" /> Build for GCP, Azure, AWS and more
+* Serverless Framework (2015)
+  * <mdi-check-circle class="text-green-400" /> YAML / TypeScript
+  * <mdi-check-circle class="text-green-400" /> Based on CloudFormation
+  * <mdi-check-circle class="text-green-400" /> Written in JavaScript
+  * <mdi-check-circle class="text-green-400" /> Plugin ecosystem
+* AWS SAM (2016)
+  * <mdi-check-circle class="text-green-400" /> YAML
+  * <mdi-check-circle class="text-green-400" /> Based on CloudFormation
+  * <mdi-check-circle class="text-green-400" /> Extends CloudFormation
+  * <mdi-check-circle class="text-green-400" /> Written in Python
 
-* SAM
-* Serverless Framework
-* CDK
-* Pulumi
-* Terraform
+::right::
+
+* Pulumi (2018)
+  * <mdi-check-circle class="text-green-400" /> Same as CDK
+  * <mdi-check-circle class="text-green-400" /> Build for GCP, Azure, AWS
+* AWS CDK (2019)
+  * <mdi-check-circle class="text-green-400" /> TypeScript / Go / Node.js / etc.
+  * <mdi-check-circle class="text-green-400" /> Based on CloudFormation
+  * <mdi-check-circle class="text-green-400" /> High level abstractions
+  * <mdi-check-circle class="text-green-400" /> Suitable for infrastructure projects too
+* CDKTF (2020)
+  * <mdi-check-circle class="text-green-400" /> TypeScript / Go / Node.js / etc.
+  * <mdi-check-circle class="text-green-400" /> Based on Terraform
+  * <mdi-check-circle class="text-green-400" /> Use Terraform modules
+  * <mdi-check-circle class="text-green-400" /> Build for GCP, Azure, AWS, and more
+
+---
+
+# CDK - Create a DynamoDB table
+
+```shell
+npm install -g aws-cdk
+cdk init app --language=typescript
+```
+
+```ts
+// ./cdk/lib/stack.ts
+export class NodeCountExampleAwsLambdaStack extends cdk.Stack {
+	constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+		super(scope, id, props);
+
+		const table = new dynamodb.Table(this, "Table", {
+			partitionKey: {
+				name: "name",
+				type: AttributeType.STRING,
+			},
+			billingMode: BillingMode.PAY_PER_REQUEST,
+		});
+		new CfnOutput(this, "TableName", {
+			value: table.tableName,
+		});
+
+	}
+}
+```
+
+```shell
+cdk deploy
+```
+
+---
+
+# CDK output
+
+![Local Image](table_output.png)
+
+---
+
+# Wire up to local server
+
+```ts
+// ./src/server.ts
+import { Count, createApp } from "./"
+import * as inmemory from "./db/inmemory"
+import * as dynamo from "./db/dynamo"
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+
+function getDynamo(tableName: string): dynamo.DB {
+        console.log(`getting DynamoDB client for table ${tableName}`)
+        const documentClient = DynamoDBDocumentClient.from(new DynamoDBClient({ region: process.env.DYNAMODB_REGION }))
+        return new dynamo.DB(documentClient, tableName)
+}
+
+const db = process.env.TABLE_NAME ? getDynamo(process.env.TABLE_NAME) : new inmemory.DB()
+const app = createApp(db.get, db.increment)
+
+app.listen(3000, () => { console.log("listening on port 3000") })
+```
+
+```shell
+TABLE_NAME=NodeCountExampleAwsLambdaStack-TableCD117FA1-148EA78Z35U1P npx ts-node src/server.ts
+```
+
+---
+
+## Outcome
+
+```mermaid
+flowchart LR
+    curl --"GET /count/test"--> https[HTTP Server\nlocalhost:3000]
+    https --"get using local\nAWS credentials"--> db[DynamoDB in AWS]
+    db --"databse results"-->https
+    https --"{ name: test, count: 0 }"--> curl
+```
+
+<!--
+
+We can use DynamoDB from our own computer. There's no need to always launch everything to the cloud.
+
+-->
+
+---
+layout: section
+---
+
+# Let's move the compute to the cloud!
+
+---
+
+# Lambda architecture
+
+```mermaid
+flowchart LR
+    apigw["API Gateway"] --invoke--> ls["AWS Lambda"]
+    ls --request payload--> c["Your Lambda handler\n(entrypoint)"]
+    c --response payload--> ls
+    c --> db[DynamoDB]
+    db --> c
+```
+
+---
+
+# Required Lambda signature
+
+```ts
+// src/lambda/index.ts
+import { Context, APIGatewayProxyCallback, APIGatewayEvent } from 'aws-lambda';
+
+export const lambdaHandler = (event: APIGatewayEvent, context: Context, callback: APIGatewayProxyCallback): void => {
+    console.log(`Event: ${JSON.stringify(event, null, 2)}`);
+    console.log(`Context: ${JSON.stringify(context, null, 2)}`);
+    callback(null, {
+        statusCode: 200,
+        body: JSON.stringify({
+            message: 'hello world',
+        }),
+    });
+};
+```
+
+---
+
+# Express adapter
+
+```sh
+npm install serverless-http
+```
+
+```ts
+// src/lambda/index.ts
+import serverless from "serverless-http";
+import { DB } from "../../../../db/dynamo"
+import { createApp } from "../"
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+
+const documentClient = DynamoDBDocumentClient.from(new DynamoDBClient({ region: process.env.DYNAMODB_REGION }))
+const db = new DB(documentClient, process.env.TABLE_NAME)
+
+const app = createApp(db.get, db.increment)
+
+module.exports.handler = serverless(app)
+```
+
+---
+
+# CDK - Create a Lambda function
+
+```ts
+// ./cdk/lib/stack.ts
+export class NodeCountExampleAwsLambdaStack extends cdk.Stack {
+	constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+		super(scope, id, props);
+
+		// ...
+
+		const countPostFunction = new NodejsFunction(this, "CountPostFunction", {
+			entry: path.join(__dirname, "../../node-count-example/src/http/count/post/lambda/index.ts"),
+		});
+
+		// ...
+	}
+}
+```
+
+```shell
+cdk deploy
+```
+
+---
+
+# CDK - Connect the Lambda function to API Gateway
+
+```ts
+// ./cdk/lib/stack.ts
+export class NodeCountExampleAwsLambdaStack extends cdk.Stack {
+	constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+		super(scope, id, props);
+
+		// ...
+		const api = new apigatewayv2.HttpApi(this, "Api")
+
+		const countPostFunction = new NodejsFunction(this, "CountPostFunction", {
+			entry: path.join(__dirname, "../../node-count-example/src/http/count/post/lambda/index.ts"),
+		});
+		table.grantReadWriteData(countPostFunction);
+		api.addRoutes({
+			path: "/count/{proxy+}",
+			methods: [apigatewayv2.HttpMethod.POST],
+			integration: new HttpLambdaIntegration("CountPostIntegration", countPostFunction),
+		});
+
+		new CfnOutput(this, "ApiEndpoint", { value: api.url as string });
+	}
+}
+```
+
+* <mdi-warning class="text-amber-400" /> <mdi-docker class="text-blue-400" /> If you don't install `esbuild` into your project, CDK will try to use Docker.
+
+---
+
+# Getting the exection logs
 
 

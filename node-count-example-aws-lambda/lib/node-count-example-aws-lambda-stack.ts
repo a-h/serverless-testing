@@ -3,7 +3,6 @@ import { Construct } from 'constructs';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import { AttributeType, BillingMode } from 'aws-cdk-lib/aws-dynamodb';
 import * as path from 'path';
-import { Tracing } from 'aws-cdk-lib/aws-lambda';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as apigatewayv2 from '@aws-cdk/aws-apigatewayv2-alpha'
 import { HttpLambdaIntegration } from '@aws-cdk/aws-apigatewayv2-integrations-alpha';
@@ -21,6 +20,10 @@ export class NodeCountExampleAwsLambdaStack extends cdk.Stack {
 			},
 			billingMode: BillingMode.PAY_PER_REQUEST,
 		});
+		new CfnOutput(this, "TableName", {
+			value: table.tableName,
+		});
+
 		const region =  cdk.Stack.of(this).region;
 
 		const api = new apigatewayv2.HttpApi(this, "Api")
@@ -31,7 +34,6 @@ export class NodeCountExampleAwsLambdaStack extends cdk.Stack {
 				DYNAMODB_REGION: region,
 			},
 			logRetention: logs.RetentionDays.ONE_MONTH,
-			tracing: Tracing.ACTIVE,
 			memorySize: 1024,
 			timeout: Duration.seconds(10),
 		};
@@ -41,6 +43,10 @@ export class NodeCountExampleAwsLambdaStack extends cdk.Stack {
 			entry: path.join(__dirname, "../../node-count-example/src/http/count/post/lambda/index.ts"),
 		});
 		table.grantReadWriteData(countPostFunction);
+		const postUrl = countPostFunction.addFunctionUrl();
+		new CfnOutput(this, "CountPostURL", {
+			value: postUrl.url,
+		})
 		api.addRoutes({
 			path: "/count/{proxy+}",
 			methods: [apigatewayv2.HttpMethod.POST],
@@ -52,6 +58,10 @@ export class NodeCountExampleAwsLambdaStack extends cdk.Stack {
 			entry: path.join(__dirname, "../../node-count-example/src/http/count/get/lambda/index.ts"),
 		});
 		table.grantReadData(countGetFunction);
+		const getUrl = countGetFunction.addFunctionUrl();
+		new CfnOutput(this, "CountGetURL", {
+			value: getUrl.url,
+		})
 		api.addRoutes({
 			path: "/count/{proxy+}",
 			methods: [apigatewayv2.HttpMethod.GET],
