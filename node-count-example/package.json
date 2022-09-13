@@ -39,9 +39,11 @@
   "dependencies": {
     "@aws-sdk/lib-dynamodb": "^3.163.0",
     "@google-cloud/functions-framework": "^3.1.2",
+    "@types/morgan": "^1.9.3",
     "@types/node": "^18.7.14",
     "express": "^4.18.1",
     "firebase-admin": "^11.0.1",
+    "morgan": "^1.10.0",
     "serverless-http": "^3.0.2"
   }
 }
