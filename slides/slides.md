@@ -1580,16 +1580,26 @@ class MyStack extends TerraformStack {
 
 
 ---
+layout: two-cols
+---
 
 # Summary
 
-* Structuring your code in modules allows you to:
+* Structuring your code in modules lets you:
   * Test components in isolation
   * Use mocks or in-memory databases
-* Using well known interfaces like `express` allows you to:
+* Using common interfaces like `express` lets you:
   * Use the wider ecosystem:
     * Logging (e.g. `morgan`)
     * Authentication middleware
+  * Switch out later with minimal changes
 * Serverless doesn't have to be vendor lock-in
-* You don't need to use special Serverless tools, CDK works great
+* CDK works great
 
+::right::
+
+# Code
+
+https://github.com/a-h/serverless-testing
+
+![Local Image](images/qr-code.png)
