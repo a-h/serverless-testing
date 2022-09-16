@@ -1,7 +1,10 @@
 # Serverless development and testing
 
 Adrian Hesketh
+
 @adrianhesketh
+
+https://adrianhesketh.com
 
 ---
 
@@ -41,15 +44,13 @@ layout: section
 ```bash
 npm init -y
 npm install --save express
-npm install --save-dev @types/express typescript ts-node jest
+npm install --save-dev @types/express typescript ts-node
 mkdir src
 ```
 
 ---
 
 # Add a server
-
-### `./src/index.ts`
 
 ```ts
 import express from "express"
@@ -73,12 +74,15 @@ kill $!
 ```
 
 ---
-layout: two-cols
+layout: two-cols-header
 ---
 
-## ./src/index.ts part 1 - database
+## Create a fake database and use it
+
+::left::
 
 ```ts
+// ./src/index.ts
 import express from "express"
 
 interface Count {
@@ -101,8 +105,6 @@ async function increment(name: string): Promise<Count> {
 ```
 
 ::right::
-
-## ./src/index.ts part 2 - server
 
 ```ts
 const app = express()
@@ -190,7 +192,7 @@ To do this, we first have to separate the code that runs the server from the HTT
 ## Setup the testing framework
 
 ```sh
-npm i --save-dev supertest jest @types/jest esbuild-jest esbuild @types/supertest
+npm i --save-dev jest @types/jest esbuild esbuild-jest supertest @types/supertest
 ```
 
 ## ./jest.config.ts
@@ -367,9 +369,8 @@ This idea is called "Dependency Injection", and it allows us to use any database
 
 ## Normal operation
 
-### ./src/server.ts
-
 ```ts
+// ./src/server.ts
 import { DB } from "./db/inmemory"
 import { createApp } from "./"
 
@@ -624,19 +625,19 @@ It's too slow to create new tables in the cloud.
 
 # DynamoDB local options
 
-## Official AWS DynamoDB local with Java
+* Run with Java
 
 ```sh
 java -Djava.library.path=./DynamoDBLocal_lib -jar DynamoDBLocal.jar -sharedDb
 ```
 
-## Official AWS DynamoDB local with Docker
+* Run with Docker
 
 ```sh
 docker run -p 8000:8000 amazon/dynamodb-local
 ```
 
-## M1 workaround
+* Use this workaround if you've got an M1 Mac
 
 https://taint.org/2022/02/09/183535a.html
 
@@ -724,7 +725,7 @@ const createLocalTable = async (): Promise<TestDB> => {
 - src/index.ts -> app
 - src/index.test.ts -> app tests
 - src/server.ts -> local server entrypoint
-- src/database/inmemory/index.ts -> database code
+- src/database/inmemory/index.ts -> in-memory database code
 - src/database/dynamo/index.ts -> dynamodb code
 - src/database/dynamo/index.test.ts -> dynamodb integration tests
 ```
@@ -848,7 +849,7 @@ TABLE_NAME=NodeCountExampleAwsLambdaStack-TableCD117FA1-148EA78Z35U1P npx ts-nod
 flowchart LR
     curl --"GET /count/test"--> https[HTTP Server\nlocalhost:3000]
     https --"get using local\nAWS credentials"--> db[DynamoDB in AWS]
-    db --"databse results"-->https
+    db --"database results"-->https
     https --"{ name: test, count: 0 }"--> curl
 ```
 
@@ -879,27 +880,27 @@ flowchart LR
 
 ---
 
-# Required Lambda signature
+# Lambda entrypoint (handler)
 
 ```ts
 // src/lambda/index.ts
-import { Context, APIGatewayProxyCallback, APIGatewayEvent } from 'aws-lambda';
+import { Context, APIGatewayProxyResult, APIGatewayEvent } from 'aws-lambda';
 
-export const lambdaHandler = (event: APIGatewayEvent, context: Context, callback: APIGatewayProxyCallback): void => {
+export const lambdaHandler = async (event: APIGatewayEvent, context: Context): Promise<APIGatewayProxyResult> => {
     console.log(`Event: ${JSON.stringify(event, null, 2)}`);
     console.log(`Context: ${JSON.stringify(context, null, 2)}`);
-    callback(null, {
+    return {
         statusCode: 200,
         body: JSON.stringify({
             message: 'hello world',
         }),
-    });
+    };
 };
 ```
 
 ---
 
-# Express adapter
+# Express adaptor
 
 ```sh
 npm install serverless-http
@@ -919,6 +920,40 @@ const db = new DB(documentClient, process.env.TABLE_NAME)
 const app = createApp(db.get, db.increment)
 
 module.exports.handler = serverless(app)
+```
+
+<!--
+
+* This same approach can be used in Go, or in other programming languages.
+
+-->
+
+---
+
+# Ecosystem benefits
+
+```ts
+import morgan from "morgan"
+import { IncomingMessage, ServerResponse } from "node:http"
+
+function jsonLogging(tokens: morgan.TokenIndexer, req: IncomingMessage, res: ServerResponse): string {
+  return JSON.stringify({
+        time: tokens.date(req, res, 'iso'),
+        method: tokens.method(req, res),
+        url: tokens.url(req, res),
+        status: tokens.status(req, res),
+        responseSize: tokens.res(req, res, 'content-length'),
+        userAgent: tokens['user-agent'](req, res),
+        remoteIp: tokens['remote-addr'](req, res),
+        referer: tokens.referrer(req, res),
+        protocol: `HTTP/${tokens['http-version'](req, res)}`,
+        response_time: tokens['response-time'](req, res),
+        total_time: tokens['total-time'](req, res),
+  })
+}
+
+const app = express()
+app.use(morgan(jsonLogging))
 ```
 
 ---
@@ -945,6 +980,8 @@ export class NodeCountExampleAwsLambdaStack extends cdk.Stack {
 ```shell
 cdk deploy
 ```
+
+* <mdi-warning class="text-amber-400" /> <mdi-docker class="text-blue-400" /> If you don't install `esbuild` into your project, CDK will try to use Docker.
 
 ---
 
@@ -974,11 +1011,360 @@ export class NodeCountExampleAwsLambdaStack extends cdk.Stack {
 }
 ```
 
-* <mdi-warning class="text-amber-400" /> <mdi-docker class="text-blue-400" /> If you don't install `esbuild` into your project, CDK will try to use Docker.
+---
+layout: two-cols-header
+---
+
+# Deploying 
+
+```sh
+cdk deploy
+cdk deploy --hotswap
+cdk deploy --watch
+```
+
+- <mdi-warning class="text-amber-400" /> The `--hotswap` flag deliberately introduces CloudFormation drift to speed up deployments
+- <mdi-warning class="text-amber-400" /> It should only be used for development - never use it for your production Stacks!
+
+---
+layout: two-cols-header
+---
+
+# Getting the logs
+
+::left::
+
+```sh
+curl https://xxxxx.amazonaws.com/count/test123
+saw get CountGet --fuzzy
+```
+
+![Local Image](saw_output.png)
+
+
+::right::
+
+* https://github.com/TylerBrock/saw
+  * Written in Go
+  * I use my fork
+* Also rans
+  * sam logs
+  * sls logs
+  * https://github.com/jorgebastida/awslogs
+
+<!--
+
+* Don't bother logging into the console
+* Serverless Framework and SAM support getting logs for specific functions.
+* CDK doesn't, so you need a separate tool.
+* I use a fork of saw.
+
+-->
 
 ---
 
-# Getting the exection logs
+# Speed tips
 
-* https://github.com/TylerBrock/saw
+* Get your app logic working well locally first
+* Use unit tests for the fastest feedback
+* Avoid Docker
+* Use a fast transpiler/bundler for Node.js projects
+* Don't get stuck waiting for CI/CD to deploy
+* Don't bother logging in to the console to read logs
+* Hotswap your code changes
+
+---
+layout: section
+---
+
+# Containers
+
+---
+
+# Dockerise it - get the dependencies
+
+```dockerfile
+# Install dependencies only when needed
+FROM node:16 AS deps
+WORKDIR /app
+
+# Install dependencies based on the preferred package manager
+COPY package.json yarn.lock* package-lock.json* pnpm-lock.yaml* ./
+RUN npm ci
+
+# Get local esbuild.
+RUN mkdir esbuild && \
+    curl -fsSL -o esbuild.tgz https://registry.npmjs.org/esbuild-linux-arm64/-/esbuild-linux-arm64-0.15.7.tgz && \
+    tar xf ./esbuild.tgz && \
+    cp ./package/bin/esbuild ./esbuild && \
+    rm -rf package
+```
+
+---
+
+# Build the app
+
+```dockerfile
+# Rebuild the source code only when needed
+FROM node:16 AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/esbuild ./esbuild
+COPY . .
+
+RUN npm run build-ci
+```
+
+---
+
+# Create the production container
+
+```dockerfile
+# Production image, copy all the files and run
+FROM node:16 AS runner
+WORKDIR /app
+
+ENV NODE_ENV production
+
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 app
+
+COPY --from=builder /app/dist ./
+
+USER app
+
+EXPOSE 3000
+
+ENV PORT 3000
+
+CMD ["node", "server.js"]
+```
+
+---
+
+# Create a Docker image
+
+```ts
+        const image = new DockerImageAsset(this, "DockerImage", {
+                directory: path.join(__dirname, "../../node-count-example"),
+                platform: Platform.LINUX_ARM64,
+        })
+```
+
+---
+
+# Create a task
+
+```ts
+        const taskDefinition = new FargateTaskDefinition(this, "TaskDefinition", {
+                runtimePlatform: {
+                        operatingSystemFamily: OperatingSystemFamily.LINUX,
+                        cpuArchitecture: CpuArchitecture.ARM64,
+                },
+        });
+        table.grantReadWriteData(taskDefinition.taskRole)
+        taskDefinition.addContainer("Web", {
+                portMappings: [{ containerPort: 3000 }],
+                image: ContainerImage.fromDockerImageAsset(image),
+                environment: { TABLE_NAME: table.tableName, DYNAMODB_REGION: region },
+                logging: new AwsLogDriver({ streamPrefix: "NodeCountExample" }),
+        });
+```
+
+---
+
+# Run it as a service
+
+```ts
+        const service = new ApplicationLoadBalancedFargateService(this, "LoadBalancedService", {
+                assignPublicIp: true,
+                taskDefinition,
+        })
+        service.targetGroup.configureHealthCheck({
+                path: '/healthcheck',
+                protocol: Protocol.HTTP,
+                interval: cdk.Duration.seconds(5),
+                timeout: cdk.Duration.seconds(3),
+                healthyThresholdCount: 3,
+        })
+        new CfnOutput(this, "EndpointURL", { value: service.loadBalancer.loadBalancerDnsName })
+```
+
+---
+layout: section
+---
+
+# Multi-cloud!
+
+---
+layout: two-cols
+---
+
+# CDKTF
+
+* Uses Terraform providers to deploy all sorts of things
+  * Snowflake
+  * GCP
+  * Azure
+  * AWS
+
+::right::
+
+# GCP
+
+* Lambda -> Cloud Functions
+* DynamoDB -> Cloud Firestore
+
+---
+
+# Implement the database interface
+
+```ts
+// ./src/db/firestore/index.ts
+import * as admin from "firebase-admin";
+import { FieldValue } from "firebase-admin/firestore";
+
+admin.initializeApp()
+const db = admin.firestore()
+
+export async function get(name: string): Promise<Count> {
+	const record = await db.collection("count").doc(name).get()
+	if (!record.exists) {
+		return null
+	}
+	return record.data() as Count;
+}
+
+export async function put(name: string): Promise<Count> {
+	await db.collection("count").doc(name).update({
+		"count": FieldValue.increment(1),
+	})
+	return get(name);
+}
+```
+
+---
+
+# Create a Cloud Function entrypoint
+
+```ts
+// ./src/http/count/cloudfunction/index.ts
+import { HttpFunction } from '@google-cloud/functions-framework';
+import express = require('express');
+import * as countGet from "../get"
+import * as countPost from "../post";
+import * as db from "../../../db/firestore";
+import { requestLogger } from "../../requestlogger"
+
+const app = express()
+app.use(express.json())
+app.use(requestLogger)
+
+app.get(countGet.route, countGet.create(db.get))
+app.post(countPost.route, countPost.create(db.put))
+
+export const fn: HttpFunction = app;
+```
+
+<!--
+
+* We're reusing the HTTP handler logic, but implementing a new database and entrypoint.
+
+-->
+
+---
+
+# cdktf
+
+```sh
+cdktf deploy
+```
+
+```ts
+class MyStack extends TerraformStack {
+        constructor(scope: Construct, name: string) {
+                super(scope, name);
+
+                const credentialsPath = path.join(process.cwd(), "google.json");
+                const credentials = fs.existsSync(credentialsPath)
+                        ? fs.readFileSync(credentialsPath).toString()
+                        : "{}";
+
+                new GoogleProvider(this, "Google", {
+                        region: "us-central1",
+                        zone: "us-central1-c",
+                        project: "quantum-plasma-316913",
+                        credentials,
+                });
+```
+
+---
+
+# Create the database and function
+
+```ts
+        // Create a Cloud Firestore. This requires an AppEngine project.
+        new AppEngineApplication(this, "app-engine-app", {
+                locationId: "europe-west",
+                databaseType: "CLOUD_FIRESTORE",
+        })
+
+        // Create a function.
+        const codeBucket = new StorageBucket(this, "bucket", {
+                name: "a-h-node-count-storage-bucket",
+                location: "EU",
+        });
+
+        // This requires that the Cloud Function has already been built (i.e. esbuild has been run).
+        // See the package.json file for node-count-example, for the build script (cloudfunction-build).
+        const asset = new TerraformAsset(this, "cloud-function-asset", {
+                path: path.join(__dirname, "../node-count-example/src/http/count/cloudfunction/dist"),
+                type: AssetType.ARCHIVE,
+        });
+```
+
+---
+
+# Wire up the function, and give it permission
+
+```ts
+        const codeObject = new StorageBucketObject(this, "archive", {
+                name: asset.fileName,
+                bucket: codeBucket.name,
+                source: asset.path,
+        });
+
+        const cloudFunction = new CloudfunctionsFunction(this, "count", {
+                name: "fn",
+                runtime: "nodejs16",
+                availableMemoryMb: 256,
+                sourceArchiveBucket: codeBucket.name,
+                sourceArchiveObject: codeObject.name,
+                triggerHttp: true,
+        })
+
+        new CloudfunctionsFunctionIamBinding(this, "invoker", {
+                cloudFunction: cloudFunction.name,
+                members: ["allUsers"],
+                role: "roles/cloudfunctions.invoker",
+        })
+
+        new TerraformOutput(this, "cloudFunctionUrl", {
+                value: cloudFunction.httpsTriggerUrl,
+        })
+```
+
+---
+
+# Summary
+
+* Structuring your code in modules allows you to:
+  * Test components in isolation
+  * Use mocks or in-memory databases
+* Using well known interfaces like `express` allows you to:
+  * Use the wider ecosystem:
+    * Logging (e.g. `morgan`)
+    * Authentication middleware
+* Serverless doesn't have to be vendor lock-in
+* You don't need to use Serverless tools, you can use CDK
 

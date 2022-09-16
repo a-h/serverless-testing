@@ -23,15 +23,17 @@ const props = defineProps({
 </script>
 
 <template>
-    <div class="slidev-layout two-columns w-full h-full grid grid-cols-2">
+  <div class="slidev-layout two-columns w-full h-full">
     <div class="col-span-2">
       <slot />
     </div>
-    <div class="col-left" :class="props.class">
-      <slot name="left" />
-    </div>
-    <div class="col-right" :class="props.class">
-      <slot name="right" />
+    <div class="grid grid-cols-2 grid-rows-2">
+      <div class="col-left" :class="props.class">
+        <slot name="left" />
+      </div>
+      <div class="col-right" :class="props.class">
+        <slot name="right" />
+      </div>
     </div>
   </div>
 </template>
