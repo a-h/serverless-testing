@@ -6,17 +6,19 @@ Adrian Hesketh
 
 https://adrianhesketh.com
 
+https://infinityworks.com
+
 ---
 
 # Make a counter
 
-## GET /count/{name}
+## `GET /count/:name`
 
 * Returns the `name` and `count` as a JSON object.
 * Returns a zero count if a count with the name doesn't exist.
 * Returns a 500 status if there's a database error.
 
-## POST /count/{name}
+## `POST /count/:name`
 
 * Does not require a HTTP body.
 * Increments the count of the name by 1.
@@ -68,18 +70,13 @@ app.listen(3000, "localhost", () => {
 ```
 
 ```bash
-npx ts-node ./src/index.ts &
+npx ts-node ./src/index.ts
 curl localhost:3000
-kill $!
 ```
 
 ---
-layout: two-cols-header
----
 
-## Create a fake database and use it
-
-::left::
+# Create a fake database
 
 ```ts
 // ./src/index.ts
@@ -104,7 +101,9 @@ async function increment(name: string): Promise<Count> {
 }
 ```
 
-::right::
+---
+
+# Use the fake database
 
 ```ts
 const app = express()
@@ -253,14 +252,14 @@ It makes the test output clear and understandable.
 layout: two-cols
 ---
 
-## GET /count/{name}
+## `GET /count/:name`
 
 * <mdi-check-circle class="text-green-400" /> `name` and `count` as a JSON object.
 * <mdi-check-circle class="text-green-400" /> zero if a count with the name doesn't exist.
 * <mdi-help-circle class="text-amber-400" /> 500 status if there's a database error.
 
 ::right::
-## POST /count/{name}
+## `POST /count/:name`
 
 * <mdi-check-circle class="text-green-400" /> does not require a HTTP body. 
 * <mdi-check-circle class="text-green-400" /> increments the count of the name by 1.
@@ -314,12 +313,17 @@ The idea is that there are clear areas of responsibility in each area. One modul
 -->
 
 ---
-layout: two-cols
+layout: two-cols-header
 ---
 
-### ./src/index.ts - before
+# Use dependency injection
+
+::left::
+
+## Before
 
 ```ts
+// ./src/index.ts
 import express from "express"
 
 export const app = express()
@@ -335,9 +339,10 @@ app.get("/count/:name", async (req, res) => {
 
 ::right::
 
-### ./src/index.ts - after
+## After
 
 ```ts
+// ./src/index.ts
 import express from "express"
 
 type F = (name: string) => Promise<Count>
@@ -414,7 +419,7 @@ flowchart LR
 
 ## Force the database code to crash
 
-```ts
+```ts {1-3|8}
 function throwDatabaseError(): Promise<Count> {
         throw new Error("database error")
 }
@@ -439,6 +444,30 @@ Now we can write a function that simulates a database failure by throwing an err
 
 The test fails because we haven't actually implemented the functionality.
 -->
+
+---
+
+## Force the database code to crash
+
+```ts {8}
+function throwDatabaseError(): Promise<Count> {
+        throw new Error("database error")
+}
+
+describe("GET /count/:name", () => {
+        // ...
+        it("returns a 500 status if there's a database error", async () => {
+                const errorApp = createApp(throwDatabaseError, throwDatabaseError)
+                const res = await request(errorApp).get("/count/fail")
+                expect(res.statusCode).toEqual(500)
+                expect(res.body).toEqual({
+                        status: 500,
+                        msg: "internal server error",
+                })
+        })
+        // ...
+})
+```
 
 ---
 
@@ -492,7 +521,7 @@ To implement the missing behaviour, the simplest thing is to use a try catch blo
 
 * We _still_ have a server we can run that uses an in-memory database.
 * We can _still_ use it with `curl`.
-* We now have unit tests for all of the defined behaviours.
+* We have unit tests for all of the defined behaviours.
 * We have split code into defined areas of responsibility.
 
 ## Important files
@@ -602,6 +631,58 @@ export class DB {
 ```
 
 ---
+
+# DynamoDB increment
+
+```ts {7}
+export class DB {
+        // ...
+        increment = async (name: string): Promise<Count> => {
+                const result = await this.client.send(new UpdateCommand({
+                        TableName: this.table,
+                        Key: { name },
+                        UpdateExpression: "SET #c = if_not_exists(#c, :zero) + :one",
+                        ExpressionAttributeNames: {
+                                "#c": "count",
+                        },
+                        ExpressionAttributeValues: {
+                                ":zero": 0,
+                                ":one": 1,
+                        },
+                        ReturnValues: "ALL_NEW",
+                })
+                return result.Attributes as Count
+        }
+}
+```
+
+---
+
+# DynamoDB increment
+
+```ts {15}
+export class DB {
+        // ...
+        increment = async (name: string): Promise<Count> => {
+                const result = await this.client.send(new UpdateCommand({
+                        TableName: this.table,
+                        Key: { name },
+                        UpdateExpression: "SET #c = if_not_exists(#c, :zero) + :one",
+                        ExpressionAttributeNames: {
+                                "#c": "count",
+                        },
+                        ExpressionAttributeValues: {
+                                ":zero": 0,
+                                ":one": 1,
+                        },
+                        ReturnValues: "ALL_NEW",
+                })
+                return result.Attributes as Count
+        }
+}
+```
+
+---
 layout: statement
 ---
 
@@ -651,6 +732,93 @@ I don't like to use Docker in my day-to-day workflow. It uses RAM and CPU.
 
 # Test structure
 
+```ts {4}
+describe("DynamoDB", () => {
+  describe("increment", () => {
+    it("creates a record if one does not exist, and sets the initial value to 1", async () => {
+      const testDB = await createLocalTable();
+      try {
+        // Arrange.
+        const db = new DB(testDB.client, testDB.name);
+
+        // Act.
+        const actual = await db.increment("test1")
+
+        // Assert.
+        expect(actual).toEqual({
+          name: "test1",
+          count: 1,
+        });
+      } finally {
+        await testDB.delete();
+      }
+    });
+  })
+})
+```
+
+---
+
+# Test structure
+
+```ts {7}
+describe("DynamoDB", () => {
+  describe("increment", () => {
+    it("creates a record if one does not exist, and sets the initial value to 1", async () => {
+      const testDB = await createLocalTable();
+      try {
+        // Arrange.
+        const db = new DB(testDB.client, testDB.name);
+
+        // Act.
+        const actual = await db.increment("test1")
+
+        // Assert.
+        expect(actual).toEqual({
+          name: "test1",
+          count: 1,
+        });
+      } finally {
+        await testDB.delete();
+      }
+    });
+  })
+})
+```
+
+---
+
+# Test structure
+
+```ts {18}
+describe("DynamoDB", () => {
+  describe("increment", () => {
+    it("creates a record if one does not exist, and sets the initial value to 1", async () => {
+      const testDB = await createLocalTable();
+      try {
+        // Arrange.
+        const db = new DB(testDB.client, testDB.name);
+
+        // Act.
+        const actual = await db.increment("test1")
+
+        // Assert.
+        expect(actual).toEqual({
+          name: "test1",
+          count: 1,
+        });
+      } finally {
+        await testDB.delete();
+      }
+    });
+  })
+})
+```
+
+---
+
+# Test structure
+
 ```ts
 describe("DynamoDB", () => {
   describe("increment", () => {
@@ -689,13 +857,12 @@ const createLocalTable = async (): Promise<TestDB> => {
   };
   const ddb = new DynamoDBClient(options);
   const tableName = randomTableName();
-  const createTableCommand = new CreateTableCommand({
+  await ddb.send(new CreateTableCommand({
     KeySchema: [{ KeyType: "HASH", AttributeName: "name" }],
     TableName: tableName,
     AttributeDefinitions: [ { AttributeName: "name", AttributeType: "S" } ],
     BillingMode: "PAY_PER_REQUEST",
   })
-  await ddb.send(createTableCommand);
   return {
     name: tableName,
     client: DynamoDBDocumentClient.from(ddb),
@@ -747,12 +914,12 @@ layout: two-cols
   * <mdi-check-circle class="text-green-400" /> Module ecosystem
   * <mdi-check-circle class="text-green-400" /> Build for GCP, Azure, AWS and more
 * Serverless Framework (2015)
-  * <mdi-check-circle class="text-green-400" /> YAML / TypeScript
+  * <mdi-alert class="text-amber-400" /> YAML
   * <mdi-check-circle class="text-green-400" /> Based on CloudFormation
   * <mdi-check-circle class="text-green-400" /> Written in JavaScript
   * <mdi-check-circle class="text-green-400" /> Plugin ecosystem
 * AWS SAM (2016)
-  * <mdi-check-circle class="text-green-400" /> YAML
+  * <mdi-alert class="text-amber-400" /> YAML
   * <mdi-check-circle class="text-green-400" /> Based on CloudFormation
   * <mdi-check-circle class="text-green-400" /> Extends CloudFormation
   * <mdi-check-circle class="text-green-400" /> Written in Python
@@ -782,7 +949,7 @@ npm install -g aws-cdk
 cdk init app --language=typescript
 ```
 
-```ts
+```ts {5-15}
 // ./cdk/lib/stack.ts
 export class NodeCountExampleAwsLambdaStack extends cdk.Stack {
 	constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -812,6 +979,62 @@ cdk deploy
 # CDK output
 
 ![Local Image](table_output.png)
+
+---
+
+# Wire up to local server
+
+```ts {7-12}
+// ./src/server.ts
+import { Count, createApp } from "./"
+import * as inmemory from "./db/inmemory"
+import * as dynamo from "./db/dynamo"
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+
+function getDynamo(tableName: string): dynamo.DB {
+        console.log(`getting DynamoDB client for table ${tableName}`)
+        const documentClient = DynamoDBDocumentClient.from(new DynamoDBClient({ region: process.env.DYNAMODB_REGION }))
+        return new dynamo.DB(documentClient, tableName)
+}
+
+const db = process.env.TABLE_NAME ? getDynamo(process.env.TABLE_NAME) : new inmemory.DB()
+const app = createApp(db.get, db.increment)
+
+app.listen(3000, () => { console.log("listening on port 3000") })
+```
+
+```shell
+TABLE_NAME=NodeCountExampleAwsLambdaStack-TableCD117FA1-148EA78Z35U1P npx ts-node src/server.ts
+```
+
+---
+
+# Wire up to local server
+
+```ts {14}
+// ./src/server.ts
+import { Count, createApp } from "./"
+import * as inmemory from "./db/inmemory"
+import * as dynamo from "./db/dynamo"
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+
+function getDynamo(tableName: string): dynamo.DB {
+        console.log(`getting DynamoDB client for table ${tableName}`)
+        const documentClient = DynamoDBDocumentClient.from(new DynamoDBClient({ region: process.env.DYNAMODB_REGION }))
+        return new dynamo.DB(documentClient, tableName)
+}
+
+const db = process.env.TABLE_NAME ? getDynamo(process.env.TABLE_NAME) : new inmemory.DB()
+const app = createApp(db.get, db.increment)
+
+app.listen(3000, () => { console.log("listening on port 3000") })
+```
+
+```shell
+TABLE_NAME=NodeCountExampleAwsLambdaStack-TableCD117FA1-148EA78Z35U1P npx ts-node src/server.ts
+```
 
 ---
 
@@ -906,7 +1129,7 @@ export const lambdaHandler = async (event: APIGatewayEvent, context: Context): P
 npm install serverless-http
 ```
 
-```ts
+```ts {2,11-12}
 // src/lambda/index.ts
 import serverless from "serverless-http";
 import { DB } from "../../../../db/dynamo"
@@ -918,7 +1141,6 @@ const documentClient = DynamoDBDocumentClient.from(new DynamoDBClient({ region: 
 const db = new DB(documentClient, process.env.TABLE_NAME)
 
 const app = createApp(db.get, db.increment)
-
 module.exports.handler = serverless(app)
 ```
 
@@ -960,7 +1182,7 @@ app.use(morgan(jsonLogging))
 
 # CDK - Create a Lambda function
 
-```ts
+```ts {8-12}
 // ./cdk/lib/stack.ts
 export class NodeCountExampleAwsLambdaStack extends cdk.Stack {
 	constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -971,6 +1193,7 @@ export class NodeCountExampleAwsLambdaStack extends cdk.Stack {
 		const countPostFunction = new NodejsFunction(this, "CountPostFunction", {
 			entry: path.join(__dirname, "../../node-count-example/src/http/count/post/lambda/index.ts"),
 		});
+		table.grantReadWriteData(countPostFunction);
 
 		// ...
 	}
@@ -987,7 +1210,7 @@ cdk deploy
 
 # CDK - Connect the Lambda function to API Gateway
 
-```ts
+```ts {7-12}
 // ./cdk/lib/stack.ts
 export class NodeCountExampleAwsLambdaStack extends cdk.Stack {
 	constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -995,11 +1218,6 @@ export class NodeCountExampleAwsLambdaStack extends cdk.Stack {
 
 		// ...
 		const api = new apigatewayv2.HttpApi(this, "Api")
-
-		const countPostFunction = new NodejsFunction(this, "CountPostFunction", {
-			entry: path.join(__dirname, "../../node-count-example/src/http/count/post/lambda/index.ts"),
-		});
-		table.grantReadWriteData(countPostFunction);
 		api.addRoutes({
 			path: "/count/{proxy+}",
 			methods: [apigatewayv2.HttpMethod.POST],
@@ -1308,8 +1526,14 @@ class MyStack extends TerraformStack {
                 locationId: "europe-west",
                 databaseType: "CLOUD_FIRESTORE",
         })
+```
 
-        // Create a function.
+---
+
+# Store the code in a bucket
+
+```ts
+        // Create a bucket to put the code in.
         const codeBucket = new StorageBucket(this, "bucket", {
                 name: "a-h-node-count-storage-bucket",
                 location: "EU",
@@ -1321,19 +1545,19 @@ class MyStack extends TerraformStack {
                 path: path.join(__dirname, "../node-count-example/src/http/count/cloudfunction/dist"),
                 type: AssetType.ARCHIVE,
         });
-```
 
----
-
-# Wire up the function, and give it permission
-
-```ts
         const codeObject = new StorageBucketObject(this, "archive", {
                 name: asset.fileName,
                 bucket: codeBucket.name,
                 source: asset.path,
         });
+```
 
+---
+
+# Create the function and give it permission
+
+```ts
         const cloudFunction = new CloudfunctionsFunction(this, "count", {
                 name: "fn",
                 runtime: "nodejs16",
@@ -1354,6 +1578,7 @@ class MyStack extends TerraformStack {
         })
 ```
 
+
 ---
 
 # Summary
@@ -1366,5 +1591,5 @@ class MyStack extends TerraformStack {
     * Logging (e.g. `morgan`)
     * Authentication middleware
 * Serverless doesn't have to be vendor lock-in
-* You don't need to use Serverless tools, you can use CDK
+* You don't need to use special Serverless tools, CDK works great
 
