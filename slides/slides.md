@@ -10,6 +10,31 @@ https://infinityworks.com
 
 ---
 
+# Covered in this session
+
+* Building a basic REST API with Express/TypeScript
+* Unit testing your API
+* Writing integration tests with DynamoDB Local
+* Quick comparison of Serverless tools
+* Using CDK to create a DynamoDB database
+* Migrating your Express app to Lambda in the cloud
+* Migrating your Serverless app to Fargate
+* Migrating your Serverless app to Google Cloud Functions
+
+---
+layout: two-cols
+---
+
+# Code and slides
+
+https://github.com/a-h/serverless-testing
+
+::right::
+
+![Local Image](qr-code.png)
+
+---
+
 # Make a counter
 
 ## `GET /count/:name`
@@ -51,35 +76,14 @@ mkdir src
 ```
 
 ---
-
-# Add a server
-
-```ts
-import express from "express"
-
-const app = express()
-app.use(express.json())
-
-app.get("/", (_req, res) => {
-	res.json({ "msg": "Hello, World" })
-})
-
-app.listen(3000, "localhost", () => {
-	console.log("listening on http://localhost:3000")
-})
-```
-
-```bash
-npx ts-node ./src/index.ts
-curl localhost:3000
-```
-
+layout: two-cols-header
 ---
 
-# Create a fake database
+# Create the API
+
+::left::
 
 ```ts
-// ./src/index.ts
 import express from "express"
 
 interface Count {
@@ -101,9 +105,7 @@ async function increment(name: string): Promise<Count> {
 }
 ```
 
----
-
-# Use the fake database
+::right:: 
 
 ```ts
 const app = express()
@@ -131,7 +133,7 @@ app.listen(3000, "localhost", () => {
 ## We have a server we can run that uses an in-memory database.
 
 ```bash
-npx ts-node ./src/server.ts
+npx ts-node ./src/index.ts
 ```
 
 ## We can test it with `curl`.
@@ -473,6 +475,11 @@ describe("GET /count/:name", () => {
 
 ## The test fails
 
+<style type="text/css">
+.slidev-layout h1 + p {
+  opacity: 1 !important;
+}
+</style>
 
 ![Local Image](tests_500_failed.png)
 
@@ -591,7 +598,12 @@ We've been messing about with a fake database. Let's use DynamoDB.
 import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 
 export class DB {
-        // ...
+        readonly client: DynamoDBDocumentClient
+        readonly table: string
+        constructor(client: DynamoDBDocumentClient, table: string) {
+                this.client = client
+                this.table = table
+        }
         get = async (name: string): Promise<Count> => {
                 const result = await this.client.send(new GetCommand({
                         TableName: this.table,
@@ -877,6 +889,12 @@ const createLocalTable = async (): Promise<TestDB> => {
 
 # Test results
 
+<style type="text/css">
+.slidev-layout h1 + p {
+  opacity: 1 !important;
+}
+</style>
+
 ![Local Image](test_database.png)
 
 ---
@@ -977,6 +995,12 @@ cdk deploy
 ---
 
 # CDK output
+
+<style type="text/css">
+.slidev-layout h1 + p {
+  opacity: 1 !important;
+}
+</style>
 
 ![Local Image](table_output.png)
 
@@ -1264,7 +1288,7 @@ saw get CountGet --fuzzy
 
 * https://github.com/TylerBrock/saw
   * Written in Go
-  * I use my fork
+  * I use my fork: https://github.com/a-h/saw
 * Also rans
   * sam logs
   * sls logs
@@ -1602,4 +1626,4 @@ layout: two-cols
 
 https://github.com/a-h/serverless-testing
 
-![Local Image](images/qr-code.png)
+![Local Image](qr-code.png)
