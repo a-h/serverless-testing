@@ -22,7 +22,7 @@ describe("GET /count/:name", () => {
         it("returns the count, if available", async () => {
                 // Arrange.
                 const name = "name1"
-                await db.put(name)
+                await db.increment(name)
 
                 // Act.
                 const res = await request(app).get("/count/" + name)

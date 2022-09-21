@@ -1008,7 +1008,7 @@ cdk deploy
 
 # Wire up to local server
 
-```ts {7-12}
+```ts {14}
 // ./src/server.ts
 import { Count, createApp } from "./"
 import * as inmemory from "./db/inmemory"
@@ -1036,7 +1036,7 @@ TABLE_NAME=NodeCountExampleAwsLambdaStack-TableCD117FA1-148EA78Z35U1P npx ts-nod
 
 # Wire up to local server
 
-```ts {14}
+```ts {7-12}
 // ./src/server.ts
 import { Count, createApp } from "./"
 import * as inmemory from "./db/inmemory"

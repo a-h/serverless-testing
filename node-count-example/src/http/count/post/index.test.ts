@@ -8,7 +8,7 @@ app.use(express.json())
 
 const db = new DB()
 
-app.post(countPost.route, countPost.create(db.put))
+app.post(countPost.route, countPost.create(db.increment))
 
 describe("POST /count/:name", () => {
         it("starts a new value from 1", async () => {
@@ -22,7 +22,7 @@ describe("POST /count/:name", () => {
         it("adds 1 to an existing count", async () => {
                 // Arrange.
                 const name = "name1"
-                await db.put(name)
+                await db.increment(name)
 
                 // Act.
                 const res = await request(app).post("/count/" + name)
