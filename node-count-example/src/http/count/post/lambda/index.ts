@@ -14,6 +14,6 @@ const ddbClient = new DynamoDBClient({ region: process.env.DYNAMODB_REGION })
 const documentClient = DynamoDBDocumentClient.from(ddbClient)
 const db = new DB(documentClient, process.env.TABLE_NAME)
 
-app.get(countPost.route, countPost.create(db.get))
+app.post(countPost.route, countPost.create(db.increment))
 
 module.exports.handler = serverless(app);
