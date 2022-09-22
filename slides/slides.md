@@ -76,12 +76,8 @@ mkdir src
 ```
 
 ---
-layout: two-cols-header
----
 
-# Create the API
-
-::left::
+# Create the API - DB
 
 ```ts
 import express from "express"
@@ -104,8 +100,9 @@ async function increment(name: string): Promise<Count> {
 	return get(name)
 }
 ```
+---
 
-::right:: 
+# Create the API - HTTP
 
 ```ts
 const app = express()
@@ -1182,7 +1179,7 @@ module.exports.handler = serverless(app)
 import morgan from "morgan"
 import { IncomingMessage, ServerResponse } from "node:http"
 
-function jsonLogging(tokens: morgan.TokenIndexer, req: IncomingMessage, res: ServerResponse): string {
+function fmt(tokens: morgan.TokenIndexer, req: IncomingMessage, res: ServerResponse): string {
   return JSON.stringify({
         time: tokens.date(req, res, 'iso'),
         method: tokens.method(req, res),
@@ -1199,7 +1196,7 @@ function jsonLogging(tokens: morgan.TokenIndexer, req: IncomingMessage, res: Ser
 }
 
 const app = express()
-app.use(morgan(jsonLogging))
+app.use(morgan(fmt))
 ```
 
 ---
@@ -1215,7 +1212,7 @@ export class NodeCountExampleAwsLambdaStack extends cdk.Stack {
 		// ...
 
 		const countPostFunction = new NodejsFunction(this, "CountPostFunction", {
-			entry: path.join(__dirname, "../../node-count-example/src/http/count/post/lambda/index.ts"),
+			entry: path.join(__dirname, "../../node-count/src/http/count/post/lambda/index.ts"),
 		});
 		table.grantReadWriteData(countPostFunction);
 
@@ -1618,7 +1615,7 @@ layout: two-cols
     * Authentication middleware
   * Switch out later with minimal changes
 * Serverless doesn't have to be vendor lock-in
-* CDK works great
+* Come to my free CDK workshop to get hands on
 
 ::right::
 
