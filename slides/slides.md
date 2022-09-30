@@ -1599,6 +1599,88 @@ class MyStack extends TerraformStack {
         })
 ```
 
+---
+layout: section
+---
+
+# YAGNI
+
+---
+
+# Write your DB code and export the functions
+
+```ts
+const ddbClient = new DynamoDBClient({ region: process.env.DYNAMODB_REGION })
+let client = DynamoDBDocumentClient.from(ddbClient)
+
+let table = process.env.TABLE_NAME;
+
+export async function init(c: DynamoDBDocumentClient, tableName: string) {
+        client = c;
+        table = tableName;
+}
+
+export async function get(name: string): Promise<Count> {
+        const params = new GetCommand({
+                TableName: table,
+                Key: { name },
+                ConsistentRead: true,
+        });
+        const result = await client.send(params)
+        return result.Item ? result.Item as Count : { name, count: 0 }
+}
+```
+
+---
+
+# Import the DynamoDB implementation in your handlers
+
+```ts
+import { Request, Response } from 'express';
+import { get } from '../../../db/dynamosimple';
+
+export interface Count {
+        name: string
+        count: number
+}
+
+export const route = "/count/:name"
+
+export async function handler(req: Request, res: Response) {
+        const { name } = req.params
+        const r = await get(name)
+        res.json(r)
+}
+```
+
+---
+
+# Use spies in your tests to replace the implementation
+
+```ts
+let data: Record<string, number> = {};
+const mockCountGet = jest.fn(async (name: string): Promise<db.Count> => {
+   return { name, count: data[name] || 0 }
+});
+jest.spyOn(db, "get").mockImplementation(mockCountGet)
+
+const app = express()
+app.use(express.json())
+app.get(countGet.route, countGet.handler)
+
+describe("GET /count/:name", () => {
+        beforeEach(() => { data = {} })
+        it("returns a zero count if the name is new", async () => {
+                const res = await request(app).get("/count/new_name")
+                expect(res.statusCode).toEqual(200)
+                expect(res.body).toEqual({
+                        name: "new_name",
+                        count: 0,
+                })
+        })
+        ...
+})
+```
 
 ---
 layout: two-cols
